@@ -71,6 +71,7 @@
   .combo-item { padding: 9px 12px; cursor: pointer; font-size: 14px; }
   .combo-item:hover { background: #eef4fa; }
   .combo-item.sel { color: #1a5fb4; font-weight: bold; background: #f4f8fc; }
+  .combo-clear { color: #c5382c; font-size: 12.5px; border-bottom: 1px solid #e0e6ec; }
   .chips { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
   .chip {
     padding: 4px 12px; border-radius: 14px; border: 1px solid #a8c4e0;
@@ -1036,7 +1037,8 @@ function setupCombo(inputId, options){
   const items = () => input.value.split("、").map(s => s.trim()).filter(s => s);
   function renderMenu(){
     const cur = items();
-    menu.innerHTML = options.map(o =>
+    menu.innerHTML = `<div class="combo-item combo-clear" data-clear="1">🗑 空欄にする（全部消す）</div>`
+      + options.map(o =>
       `<div class="combo-item${cur.includes(o) ? " sel" : ""}" data-v="${o}">${cur.includes(o) ? "✓ " : ""}${o}</div>`
     ).join("");
   }
@@ -1048,10 +1050,14 @@ function setupCombo(inputId, options){
   menu.addEventListener("click", e => {
     const it = e.target.closest(".combo-item");
     if(!it) return;
-    let cur = items();
-    if(cur.includes(it.dataset.v)) cur = cur.filter(s => s !== it.dataset.v);
-    else cur.push(it.dataset.v);
-    input.value = cur.join("、");
+    if(it.dataset.clear){
+      input.value = "";
+    } else {
+      let cur = items();
+      if(cur.includes(it.dataset.v)) cur = cur.filter(s => s !== it.dataset.v);
+      else cur.push(it.dataset.v);
+      input.value = cur.join("、");
+    }
     renderMenu();
     render();
   });
