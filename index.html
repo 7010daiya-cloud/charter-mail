@@ -54,6 +54,23 @@
   .size-row span { font-size: 13px; color: #555; white-space: nowrap; }
   .check-line { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; }
   .check-line input { width: auto; }
+  /* プルダウン付き自由入力（品名用） */
+  .combo { position: relative; display: flex; }
+  .combo input { flex: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .combo-btn {
+    padding: 0 14px; border: 1px solid #c0c8d0; border-left: none; background: #eef2f6;
+    border-radius: 0 6px 6px 0; cursor: pointer; font-size: 11px; color: #555; font-weight: bold;
+  }
+  .combo-btn:hover { background: #dde5ec; }
+  .combo-menu {
+    display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 2px;
+    background: #fff; border: 1px solid #c0c8d0; border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.18); z-index: 50; max-height: 230px; overflow: auto;
+  }
+  .combo-menu.open { display: block; }
+  .combo-item { padding: 9px 12px; cursor: pointer; font-size: 14px; }
+  .combo-item:hover { background: #eef4fa; }
+  .combo-item.sel { color: #1a5fb4; font-weight: bold; background: #f4f8fc; }
   .chips { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
   .chip {
     padding: 4px 12px; border-radius: 14px; border: 1px solid #a8c4e0;
@@ -159,23 +176,19 @@
         <option>大野</option>
         <option value="">（空欄＝会社名のみ）</option>
       </select>
-      <label>件名の品名（自由入力OK）</label>
-      <input type="text" id="subjectItem" value="自動車用マフラー">
-      <div class="chips" data-chips="subjectItem" data-mode="set">
-        <button class="chip">マフラー</button>
-        <button class="chip">フロントバンパー</button>
-        <button class="chip">リアバンパー</button>
+      <label>件名の品名（▼から選択・自由入力もOK）</label>
+      <div class="combo">
+        <input type="text" id="subjectItem" value="自動車用マフラー">
+        <button type="button" class="combo-btn">▼</button>
       </div>
     </fieldset>
 
     <fieldset>
       <legend>配送詳細</legend>
-      <label>品名（自由入力OK・ボタンで追加/削除）</label>
-      <input type="text" id="itemName" value="マフラー">
-      <div class="chips" data-chips="itemName" data-mode="toggle">
-        <button class="chip">マフラー</button>
-        <button class="chip">フロントバンパー</button>
-        <button class="chip">リアバンパー</button>
+      <label>品名（▼から選択で追加/解除・複数OK・自由入力もOK）</label>
+      <div class="combo">
+        <input type="text" id="itemName" value="自動車用マフラー">
+        <button type="button" class="combo-btn">▼</button>
       </div>
       <label>サイズ（cm）</label>
       <div class="size-row">
@@ -323,8 +336,11 @@
       </fieldset>
       <fieldset style="flex:1; min-width:300px; margin:0;">
         <legend>品名・禁止事項ラベル</legend>
-        <label>品名（大きく印刷）</label>
-        <input type="text" id="labelItem" placeholder="例：自動車用ハードトップ">
+        <label>品名（大きく印刷・▼から選択もOK）</label>
+        <div class="combo">
+          <input type="text" id="labelItem" placeholder="例：自動車用ハードトップ">
+          <button type="button" class="combo-btn">▼</button>
+        </div>
         <label>禁止事項（チェックしたものが【　】付きで印刷される）</label>
         <div class="check-line"><input type="checkbox" id="banTenchi" checked><label for="banTenchi" style="margin:0">天地無用</label></div>
         <div class="check-line"><input type="checkbox" id="banUwazumi" checked><label for="banUwazumi" style="margin:0">上積み禁止</label></div>
@@ -1002,11 +1018,56 @@ function resetDefaults(){
   render();
 }
 
+/* ---- 品名のプルダウン（選択で「、」区切りに追加/解除、自由入力もOK） ---- */
+const ITEM_OPTIONS = [
+  "自動車用マフラー",
+  "自動車用フロントバンパー",
+  "自動車用リアバンパー",
+  "自動車用ハードトップ"
+];
+
+function setupCombo(inputId, options){
+  const input = $(inputId);
+  const wrap = input.closest(".combo");
+  const btn = wrap.querySelector(".combo-btn");
+  const menu = document.createElement("div");
+  menu.className = "combo-menu";
+  wrap.appendChild(menu);
+  const items = () => input.value.split("、").map(s => s.trim()).filter(s => s);
+  function renderMenu(){
+    const cur = items();
+    menu.innerHTML = options.map(o =>
+      `<div class="combo-item${cur.includes(o) ? " sel" : ""}" data-v="${o}">${cur.includes(o) ? "✓ " : ""}${o}</div>`
+    ).join("");
+  }
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".combo-menu.open").forEach(m => { if(m !== menu) m.classList.remove("open"); });
+    renderMenu();
+    menu.classList.toggle("open");
+  });
+  menu.addEventListener("click", e => {
+    const it = e.target.closest(".combo-item");
+    if(!it) return;
+    let cur = items();
+    if(cur.includes(it.dataset.v)) cur = cur.filter(s => s !== it.dataset.v);
+    else cur.push(it.dataset.v);
+    input.value = cur.join("、");
+    renderMenu();
+    render();
+  });
+  document.addEventListener("click", e => {
+    if(!wrap.contains(e.target)) menu.classList.remove("open");
+  });
+}
+
 /* ---- 初期化 ---- */
 load();
 kanaBuf = $("destKana").value;   // 復元したふりがなに続けて追記できるように
 refreshPresetList();
 FIELDS.forEach(id => $(id).addEventListener("input", render));
+setupCombo("subjectItem", ITEM_OPTIONS);
+setupCombo("itemName", ITEM_OPTIONS);
+setupCombo("labelItem", ITEM_OPTIONS);
 render();
 </script>
 </body>
