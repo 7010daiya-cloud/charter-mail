@@ -203,14 +203,12 @@
           <input type="text" id="weight" value="15">
         </div>
         <div>
-          <label>輸送方法（自由入力OK）</label>
-          <input type="text" id="method" value="小口チャーター">
+          <label>輸送方法（▼から選択・自由入力OK）</label>
+          <div class="combo">
+            <input type="text" id="method" value="小口チャーター">
+            <button type="button" class="combo-btn">▼</button>
+          </div>
         </div>
-      </div>
-      <div class="chips" data-chips="method" data-mode="set" style="justify-content:flex-end">
-        <button class="chip">小口チャーター</button>
-        <button class="chip">飛脚カンガルー便</button>
-        <button class="chip">パレットチャーター</button>
       </div>
       <div class="check-line">
         <input type="checkbox" id="useInsurance" checked>
@@ -1027,7 +1025,7 @@ const ITEM_OPTIONS = [
   "自動車用ハードトップ"
 ];
 
-function setupCombo(inputId, options){
+function setupCombo(inputId, options, single){
   const input = $(inputId);
   const wrap = input.closest(".combo");
   const btn = wrap.querySelector(".combo-btn");
@@ -1036,8 +1034,8 @@ function setupCombo(inputId, options){
   wrap.appendChild(menu);
   const items = () => input.value.split("、").map(s => s.trim()).filter(s => s);
   function renderMenu(){
-    const cur = items();
-    menu.innerHTML = `<div class="combo-item combo-clear" data-clear="1">🗑 空欄にする（全部消す）</div>`
+    const cur = single ? [input.value.trim()] : items();
+    menu.innerHTML = `<div class="combo-item combo-clear" data-clear="1">🗑 空欄にする${single ? "" : "（全部消す）"}</div>`
       + options.map(o =>
       `<div class="combo-item${cur.includes(o) ? " sel" : ""}" data-v="${o}">${cur.includes(o) ? "✓ " : ""}${o}</div>`
     ).join("");
@@ -1052,6 +1050,11 @@ function setupCombo(inputId, options){
     if(!it) return;
     if(it.dataset.clear){
       input.value = "";
+    } else if(single){
+      input.value = it.dataset.v;   // 1つ選ぶ項目は置き換え
+      menu.classList.remove("open");
+      render();
+      return;
     } else {
       let cur = items();
       if(cur.includes(it.dataset.v)) cur = cur.filter(s => s !== it.dataset.v);
@@ -1074,6 +1077,7 @@ FIELDS.forEach(id => $(id).addEventListener("input", render));
 setupCombo("subjectItem", ITEM_OPTIONS);
 setupCombo("itemName", ITEM_OPTIONS);
 setupCombo("labelItem", ITEM_OPTIONS);
+setupCombo("method", ["小口チャーター", "飛脚カンガルー便", "パレットチャーター"], true);
 render();
 </script>
 </body>
