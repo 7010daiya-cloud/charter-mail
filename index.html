@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>チャーター便メール作成</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Hiragino Sans", "Meiryo", sans-serif;
+    margin: 0; background: #f0f4f8; color: #333;
+  }
+  header {
+    background: #1a5fb4; color: #fff; padding: 14px 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  .container {
+    padding: 16px; max-width: 1200px; margin: 0 auto;
+  }
+  /* フォームとプレビューの2列。プレビューの固定(sticky)はこの行の中だけで効くので
+     下の営業所検索パネルに覆いかぶさらない */
+  .main-row {
+    display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;
+  }
+  .panel {
+    background: #fff; border-radius: 10px; padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+  }
+  #formPanel { flex: 1 1 420px; min-width: 340px; }
+  #previewPanel { flex: 1 1 420px; min-width: 340px; position: sticky; top: 16px; }
+  /* 縦積みレイアウト（狭い画面）では固定をやめる。固定のままだと下の欄に覆いかぶさる */
+  @media (max-width: 900px) {
+    #previewPanel { position: static; }
+  }
+  #branchPanel { margin-top: 16px; }
+  fieldset {
+    border: 1px solid #d0d8e0; border-radius: 8px; margin: 0 0 14px; padding: 10px 12px 12px;
+  }
+  legend { font-weight: bold; color: #1a5fb4; font-size: 14px; padding: 0 6px; }
+  label { display: block; font-size: 12px; color: #555; margin: 8px 0 2px; }
+  input[type=text], input[type=date], select, textarea {
+    width: 100%; padding: 7px 9px; border: 1px solid #c0c8d0; border-radius: 6px;
+    font-size: 14px; font-family: inherit;
+  }
+  input:focus, select:focus { outline: 2px solid #1a5fb4; border-color: transparent; }
+  .row { display: flex; gap: 8px; }
+  .row > div { flex: 1; }
+  .zip-row { display: flex; gap: 6px; align-items: center; }
+  .zip-row input { width: 120px; }
+  .zip-row button { padding: 7px 10px; font-size: 12px; white-space: nowrap; }
+  .size-row { display: flex; gap: 6px; align-items: center; }
+  .size-row input { width: 70px; text-align: right; }
+  .size-row span { font-size: 13px; color: #555; white-space: nowrap; }
+  .check-line { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; }
+  .check-line input { width: auto; }
+  .chips { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+  .chip {
+    padding: 4px 12px; border-radius: 14px; border: 1px solid #a8c4e0;
+    background: #eef4fa; color: #1a5fb4; font-size: 12.5px; cursor: pointer; font-weight: normal;
+  }
+  .chip:hover { background: #dbe8f5; }
+  .chip.active { background: #1a5fb4; color: #fff; border-color: #1a5fb4; font-weight: bold; }
+  #preview {
+    white-space: pre-wrap; font-size: 13.5px; line-height: 1.7;
+    background: #fafbfc; border: 1px solid #e0e6ec; border-radius: 8px;
+    padding: 14px; min-height: 300px; word-break: break-all;
+  }
+  .subject-box {
+    background: #fafbfc; border: 1px solid #e0e6ec; border-radius: 8px;
+    padding: 8px 12px; font-size: 14px; margin-bottom: 10px; font-weight: bold;
+  }
+  .btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button {
+    padding: 10px 16px; border: none; border-radius: 8px; font-size: 14px;
+    cursor: pointer; font-family: inherit; font-weight: bold;
+  }
+  .btn-copy { background: #1a5fb4; color: #fff; flex: 1; }
+  .btn-copy:hover { background: #14487f; }
+  .btn-gmail { background: #ea4335; color: #fff; flex: 1; }
+  .btn-gmail:hover { background: #c5382c; }
+  .btn-sub { background: #e8edf2; color: #333; }
+  .btn-sub:hover { background: #d5dde5; }
+  .preset-row { display: flex; gap: 6px; margin-bottom: 4px; }
+  .preset-row select { flex: 1; }
+  .preset-row button { padding: 6px 10px; font-size: 12px; }
+  /* 入力住所の目印（地図の中心に重ねる） */
+  #branchCenterMark {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -100%);
+    pointer-events: none; text-align: center; z-index: 5;
+  }
+  #branchCenterMark .lbl {
+    background: #1a5fb4; color: #fff; font-size: 11px; font-weight: bold;
+    padding: 2px 8px; border-radius: 10px; margin-bottom: 3px; white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  }
+  #branchCenterMark .pin {
+    width: 20px; height: 20px; margin: 0 auto;
+    background: #1a5fb4; border: 3px solid #fff;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  }
+  .branch-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    border: 1px solid #e0e6ec; border-radius: 8px; padding: 8px 12px; margin-top: 8px;
+    flex-wrap: wrap; background: #fafbfc;
+  }
+  .branch-item .bi-name { font-weight: bold; font-size: 14px; }
+  .branch-item .dist { color: #1a5fb4; font-weight: bold; margin-left: 8px; font-size: 13px; }
+  .bi-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .bi-btns button { padding: 6px 10px; font-size: 12px; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #333; color: #fff; padding: 10px 22px; border-radius: 20px;
+    font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 200;
+  }
+  .toast.show { opacity: 1; }
+  .hint { font-size: 11px; color: #888; margin-top: 4px; }
+
+  /* ---- 電卓 ---- */
+  #calcOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    z-index: 100; align-items: center; justify-content: center;
+  }
+  #calcOverlay.show { display: flex; }
+  #calc {
+    background: #fff; border-radius: 14px; padding: 16px; width: 300px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.3);
+  }
+  #calc h3 { margin: 0 0 10px; font-size: 15px; color: #1a5fb4; }
+  #calcDisplay {
+    width: 100%; font-size: 22px; text-align: right; padding: 10px;
+    border: 1px solid #c0c8d0; border-radius: 8px; margin-bottom: 10px; font-family: inherit;
+  }
+  #calcGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  #calcGrid button {
+    padding: 14px 0; font-size: 18px; border-radius: 8px; background: #eef2f6;
+  }
+  #calcGrid button:hover { background: #dde5ec; }
+  #calcGrid button.op { background: #d8e6f5; color: #1a5fb4; }
+  #calcGrid button.danger { background: #fbe3e1; color: #c5382c; }
+  #calcGrid button.eq { background: #1a5fb4; color: #fff; }
+  #calc .btns button { padding: 12px 0; }
+</style>
+</head>
+<body>
+<header>🚚 <h1>チャーター便メール作成ツール</h1></header>
+
+<div class="container">
+ <div class="main-row">
+  <!-- 入力フォーム -->
+  <div class="panel" id="formPanel">
+
+    <fieldset>
+      <legend>基本</legend>
+      <label>差出人（担当者名）</label>
+      <select id="sender">
+        <option>菊地</option>
+        <option>大野</option>
+        <option value="">（空欄＝会社名のみ）</option>
+      </select>
+      <label>件名の品名（自由入力OK）</label>
+      <input type="text" id="subjectItem" value="自動車用マフラー">
+      <div class="chips" data-chips="subjectItem" data-mode="set">
+        <button class="chip">マフラー</button>
+        <button class="chip">フロントバンパー</button>
+        <button class="chip">リアバンパー</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>配送詳細</legend>
+      <label>品名（自由入力OK・ボタンで追加/削除）</label>
+      <input type="text" id="itemName" value="マフラー">
+      <div class="chips" data-chips="itemName" data-mode="toggle">
+        <button class="chip">マフラー</button>
+        <button class="chip">フロントバンパー</button>
+        <button class="chip">リアバンパー</button>
+      </div>
+      <label>サイズ（cm）</label>
+      <div class="size-row">
+        <span>長さ</span><input type="text" id="sizeL" value="200">
+        <span>× 横幅</span><input type="text" id="sizeW" value="50">
+        <span>× 高さ</span><input type="text" id="sizeH" value="20">
+      </div>
+      <div class="row">
+        <div>
+          <label>重量（数字だけ→「約○kg」になる）</label>
+          <input type="text" id="weight" value="15">
+        </div>
+        <div>
+          <label>輸送方法（自由入力OK）</label>
+          <input type="text" id="method" value="小口チャーター">
+        </div>
+      </div>
+      <div class="chips" data-chips="method" data-mode="set" style="justify-content:flex-end">
+        <button class="chip">小口チャーター</button>
+        <button class="chip">飛脚カンガルー便</button>
+        <button class="chip">パレットチャーター</button>
+      </div>
+      <div class="check-line">
+        <input type="checkbox" id="useInsurance" checked>
+        <label for="useInsurance" style="margin:0">保険加入を希望する</label>
+        <input type="text" id="insurance" value="15,800" style="width:110px; text-align:right;" title="クリックすると電卓が開きます">
+        <span style="font-size:13px">円相当 🖩</span>
+      </div>
+      <div class="hint">金額欄をクリックすると電卓が開きます（直接入力もOK）</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>お届け先情報</legend>
+      <div class="preset-row">
+        <select id="presetSelect"><option value="">📋 保存済みのお届け先から選ぶ…</option></select>
+        <button class="btn-sub" onclick="savePreset()">保存</button>
+        <button class="btn-sub" onclick="deletePreset()">削除</button>
+      </div>
+      <label>郵便番号</label>
+      <div class="zip-row">
+        <input type="text" id="destZip" value="" placeholder="例：262-0011">
+        <button class="btn-sub" onclick="zipLookup('destZip','destAddr')">〒から住所を自動入力</button>
+      </div>
+      <label>住所（〒より後ろ）</label>
+      <input type="text" id="destAddr" value="" placeholder="例：千葉県千葉市花見川区三角町657-1">
+      <label>名称</label>
+      <input type="text" id="destName" value="" placeholder="例：佐川急便(株)　○○営業所（営業所止め）">
+      <div class="row">
+        <div>
+          <label>受取人（漢字で入力→ふりがな自動）</label>
+          <input type="text" id="destPersonName" value="" autocomplete="off">
+        </div>
+        <div>
+          <label>ふりがな（自動入力・手直しOK）</label>
+          <input type="text" id="destKana" value="">
+        </div>
+      </div>
+      <label>電話番号</label>
+      <input type="text" id="destTel" value="">
+      <div class="row">
+        <div>
+          <label>到着希望日</label>
+          <input type="date" id="arriveDate">
+        </div>
+        <div>
+          <label>お客様のお引取り予定日</label>
+          <input type="date" id="pickupDate">
+        </div>
+      </div>
+      <label>お引取り時間帯（自由入力OK・空欄なら日付だけになる）</label>
+      <input type="text" id="pickupTime" value="午前中" placeholder="例：午前中、13時ごろ など">
+      <div class="chips" data-chips="pickupTime" data-mode="set">
+        <button class="chip">午前中</button>
+        <button class="chip">午後</button>
+      </div>
+      <div class="check-line">
+        <input type="checkbox" id="notifyOnArrive" checked>
+        <label for="notifyOnArrive" style="margin:0">営業所到着後にお客様へ連絡を依頼する文を入れる</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>集荷情報</legend>
+      <label>郵便番号</label>
+      <div class="zip-row">
+        <input type="text" id="srcZip" value="277-0912">
+        <button class="btn-sub" onclick="zipLookup('srcZip','srcAddr')">〒から住所を自動入力</button>
+      </div>
+      <label>住所（〒より後ろ）</label>
+      <input type="text" id="srcAddr" value="千葉県柏市泉1992-8">
+      <label>電話番号</label>
+      <input type="text" id="srcTel" value="04-7197-1226">
+      <div class="row">
+        <div>
+          <label>集荷希望日</label>
+          <select id="srcDay">
+            <option>本日</option>
+            <option>明日</option>
+            <option>明後日</option>
+          </select>
+        </div>
+        <div>
+          <label>集荷時間帯</label>
+          <input type="text" id="srcTime" value="13:00〜15:00">
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="btns">
+      <button class="btn-sub" onclick="resetDefaults()" style="width:100%">🔄 初期値に戻す（お届け先以外そのまま）</button>
+    </div>
+  </div>
+
+  <!-- プレビュー -->
+  <div class="panel" id="previewPanel">
+    <label style="margin-top:0">件名</label>
+    <div class="subject-box" id="subjectPreview"></div>
+    <label>本文</label>
+    <div id="preview"></div>
+    <div class="btns">
+      <button class="btn-copy" onclick="copyBody()">📋 本文をコピー</button>
+      <button class="btn-sub" onclick="copySubject()">件名をコピー</button>
+      <button class="btn-gmail" onclick="openGmail()">✉️ Gmailで作成</button>
+    </div>
+    <div class="hint">※入力内容はこのPCに自動保存され、次回開いたとき前回の内容が復元されます。</div>
+  </div>
+ </div>
+
+  <!-- 箱に貼るラベル印刷 -->
+  <div class="panel" id="labelPanel">
+    <legend style="font-weight:bold; color:#1a5fb4; font-size:14px;">🏷 箱に貼るラベルをA4で印刷</legend>
+    <div class="btns" style="margin-top:8px">
+      <button class="btn-sub" style="width:100%" onclick="autofillLabels()">⬆ 上のフォームの内容から自動入力</button>
+    </div>
+    <div class="row" style="flex-wrap:wrap; gap:14px; margin-top:6px;">
+      <fieldset style="flex:1; min-width:300px; margin:0;">
+        <legend>宛先ラベル</legend>
+        <label>上段：都道府県・市区町村（大きく印刷）</label>
+        <input type="text" id="labelRegion" placeholder="例：茨城県下妻市">
+        <label>下段：お客様名・企業名（「様　宛」は自動で付く）</label>
+        <input type="text" id="labelName" placeholder="例：大豊日本US">
+        <div class="btns">
+          <button class="btn-copy" onclick="printLabels('addr')">🖨 宛先ラベルを印刷</button>
+        </div>
+      </fieldset>
+      <fieldset style="flex:1; min-width:300px; margin:0;">
+        <legend>品名・禁止事項ラベル</legend>
+        <label>品名（大きく印刷）</label>
+        <input type="text" id="labelItem" placeholder="例：自動車用ハードトップ">
+        <label>禁止事項（チェックしたものが【　】付きで印刷される）</label>
+        <div class="check-line"><input type="checkbox" id="banTenchi" checked><label for="banTenchi" style="margin:0">天地無用</label></div>
+        <div class="check-line"><input type="checkbox" id="banUwazumi" checked><label for="banUwazumi" style="margin:0">上積み禁止</label></div>
+        <div class="check-line"><input type="checkbox" id="banYokooki"><label for="banYokooki" style="margin:0">横置き厳禁</label></div>
+        <div class="check-line"><input type="checkbox" id="banWaremono"><label for="banWaremono" style="margin:0">ワレモノ注意</label></div>
+        <label>追加の注意書き（「、」区切りで複数OK）</label>
+        <input type="text" id="labelExtra" placeholder="例：水濡れ注意、開封厳禁">
+        <div class="btns">
+          <button class="btn-copy" onclick="printLabels('item')">🖨 品名ラベルを印刷</button>
+        </div>
+      </fieldset>
+    </div>
+    <div class="btns">
+      <button class="btn-gmail" style="flex:1" onclick="printLabels('both')">🖨 両方まとめて印刷（2枚）</button>
+    </div>
+    <div class="hint">印刷画面が開いたら、用紙サイズA4・「横」向きになっていることを確認して印刷してください。文字は用紙の幅に合わせて自動で大きさ調整されます。</div>
+  </div>
+
+  <!-- 営業所検索 -->
+  <div class="panel" id="branchPanel">
+    <legend style="font-weight:bold; color:#1a5fb4; font-size:14px;">🔍 最寄りの佐川急便 営業所を調べる</legend>
+    <div class="row" style="margin-top:8px; align-items:flex-end;">
+      <div style="flex:2">
+        <label>調べたい住所</label>
+        <input type="text" id="branchAddr" placeholder="例：千葉県千葉市花見川区三角町657-1">
+      </div>
+      <div><button class="btn-sub" style="width:100%" onclick="copyDestToBranch()">↑お届け先の住所を入れる</button></div>
+      <div><button class="btn-copy" style="width:100%" onclick="searchBranch()">🔍 検索</button></div>
+    </div>
+    <div class="hint" id="branchStatus"></div>
+    <div id="branchResults"></div>
+    <div class="btns">
+      <button class="btn-sub" onclick="window.open('https://www.sagawa-exp.co.jp/send/branch_search/', '_blank')">佐川急便 公式の営業所検索を開く</button>
+    </div>
+    <div class="hint">検索するとこの下に地図が出ます。集荷可能かどうかなど正確な情報は公式サイトで確認してください。</div>
+  </div>
+</div>
+
+<!-- 電卓 -->
+<div id="calcOverlay">
+  <div id="calc">
+    <h3>🖩 保険金額の計算</h3>
+    <input type="text" id="calcDisplay" placeholder="0">
+    <div id="calcGrid">
+      <button class="danger" data-k="C">C</button>
+      <button class="danger" data-k="⌫">⌫</button>
+      <button class="op" data-k="÷">÷</button>
+      <button class="op" data-k="×">×</button>
+      <button data-k="7">7</button>
+      <button data-k="8">8</button>
+      <button data-k="9">9</button>
+      <button class="op" data-k="−">−</button>
+      <button data-k="4">4</button>
+      <button data-k="5">5</button>
+      <button data-k="6">6</button>
+      <button class="op" data-k="＋">＋</button>
+      <button data-k="1">1</button>
+      <button data-k="2">2</button>
+      <button data-k="3">3</button>
+      <button class="eq" data-k="=">=</button>
+      <button data-k="0">0</button>
+      <button data-k="00">00</button>
+      <button data-k="000">000</button>
+      <button data-k=".">.</button>
+    </div>
+    <div class="btns">
+      <button class="btn-copy" onclick="calcConfirm()">✅ この金額を入れる</button>
+      <button class="btn-sub" onclick="calcClose()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const FIELDS = ["sender","subjectItem","itemName","sizeL","sizeW","sizeH","weight","method",
+  "useInsurance","insurance","destZip","destAddr","destName","destPersonName","destKana","destTel",
+  "arriveDate","pickupDate","pickupTime","notifyOnArrive","srcZip","srcAddr","srcTel","srcDay","srcTime",
+  "labelRegion","labelName","labelItem","banTenchi","banUwazumi","banYokooki","banWaremono","labelExtra"];
+const LS_KEY = "charter_mail_v2";
+const LS_KEY_OLD = "charter_mail_v1";
+const LS_PRESET = "charter_mail_presets_v2";
+const LS_PRESET_OLD = "charter_mail_presets_v1";
+const WD = ["日","月","火","水","木","金","土"];
+
+function $(id){ return document.getElementById(id); }
+
+function fmtDate(v){
+  if(!v) return "";
+  const d = new Date(v + "T00:00:00");
+  return `${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`;
+}
+
+function fmtWeight(v){
+  v = v.trim();
+  if(!v) return "";
+  // 数字（小数OK）だけなら「約○kg」、それ以外はそのまま
+  return /^[0-9.]+$/.test(v) ? `約${v}kg` : v;
+}
+
+function fmtPerson(){
+  const name = $("destPersonName").value.trim();
+  const kana = $("destKana").value.trim();
+  if(!name) return "";
+  return kana ? `${name}（${kana}）様` : `${name}様`;
+}
+
+function buildSubject(){
+  return `チャーター便のご依頼（${$("subjectItem").value}）`;
+}
+
+const SECTION_LINE = "━━━━━━━━━━━━━━━━━━━━━━";
+
+// 項目行: 項目名を全角5文字幅に揃えて「　品名　　　：〜」の形にする
+function item(label, value){
+  const pad = "　".repeat(Math.max(0, 5 - label.length));
+  return `　${label}${pad}：${value}`;
+}
+function section(title){
+  return [SECTION_LINE, `　◆ ${title}`, SECTION_LINE];
+}
+
+function buildBody(){
+  const lines = [];
+  lines.push("ご担当者様");
+  lines.push("");
+  lines.push("お世話になっております。");
+  lines.push($("sender").value ? `株式会社ダイヤの${$("sender").value}でございます。` : "株式会社ダイヤでございます。");
+  lines.push("");
+  lines.push("下記の内容にて、物品の郵送手配とお見積りをお願いしたくご連絡いたしました。");
+  lines.push("");
+  lines.push(...section("配送詳細"));
+  lines.push(item("品名", $("itemName").value));
+  lines.push(item("サイズ", `長さ ${$("sizeL").value}cm × 横幅 ${$("sizeW").value}cm × 高さ ${$("sizeH").value}cm`));
+  lines.push(item("重量", fmtWeight($("weight").value)));
+  lines.push(item("輸送方法", $("method").value));
+  lines.push(item("保険", $("useInsurance").checked ? `${$("insurance").value}円相当の保険加入を希望` : "加入なし"));
+  lines.push("");
+  lines.push(...section("お届け先"));
+  lines.push(item("住所", `〒${$("destZip").value} ${$("destAddr").value}`));
+  lines.push(item("名称", $("destName").value));
+  lines.push(item("受取人", fmtPerson()));
+  lines.push(item("電話番号", $("destTel").value));
+  if($("arriveDate").value) lines.push(item("到着希望日", fmtDate($("arriveDate").value)));
+  if($("pickupDate").value || $("notifyOnArrive").checked) lines.push("");
+  if($("pickupDate").value) lines.push(`　※お客様のお引取り予定：${fmtDate($("pickupDate").value)}${$("pickupTime").value.trim() ? " " + $("pickupTime").value.trim() : ""}`);
+  if($("notifyOnArrive").checked) lines.push("　※営業所に到着後、お客様へご連絡をお願いいたします。");
+  lines.push("");
+  lines.push(...section("集荷情報（発送元）"));
+  lines.push(item("住所", `〒${$("srcZip").value} ${$("srcAddr").value}`));
+  lines.push(item("電話番号", $("srcTel").value));
+  if($("sender").value) lines.push(item("担当", $("sender").value));
+  lines.push(item("集荷希望", `${$("srcDay").value} ${$("srcTime").value}`));
+  lines.push("");
+  lines.push("お手数ですが、集荷時間の目処が立ちましたら折り返しご連絡いただけますでしょうか。");
+  lines.push("");
+  lines.push("何卒よろしくお願いいたします。");
+  return lines.join("\n");
+}
+
+function render(){
+  $("subjectPreview").textContent = buildSubject();
+  $("preview").textContent = buildBody();
+  updateChips();
+  save();
+}
+
+/* ---- 選択ボタン（チップ） ---- */
+function updateChips(){
+  document.querySelectorAll(".chips").forEach(box => {
+    const target = $(box.dataset.chips);
+    box.querySelectorAll(".chip").forEach(ch => {
+      const t = ch.textContent;
+      const active = box.dataset.mode === "toggle"
+        ? target.value.split("、").map(s => s.trim()).includes(t)
+        : target.value === t;
+      ch.classList.toggle("active", active);
+    });
+  });
+}
+
+document.querySelectorAll(".chips").forEach(box => {
+  box.addEventListener("click", e => {
+    const ch = e.target.closest(".chip");
+    if(!ch) return;
+    const target = $(box.dataset.chips);
+    const t = ch.textContent;
+    if(box.dataset.mode === "toggle"){
+      // 入っていなければ「、」で追加、入っていれば外す
+      let items = target.value.split("、").map(s => s.trim()).filter(s => s);
+      if(items.includes(t)) items = items.filter(s => s !== t);
+      else items.push(t);
+      target.value = items.join("、");
+    } else {
+      // もう一度押すと解除（空欄に戻る）
+      target.value = (target.value === t) ? "" : t;
+    }
+    render();
+  });
+});
+
+/* ---- 保存・読込 ---- */
+function save(){
+  const data = {};
+  FIELDS.forEach(id => {
+    const el = $(id);
+    data[id] = el.type === "checkbox" ? el.checked : el.value;
+  });
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
+}
+
+function splitZipAddr(s){
+  const m = (s || "").match(/^〒?\s*([0-9０-９\-ー－]+)\s*(.*)$/);
+  return m ? { zip: m[1].replace(/[ー－]/g,"-"), addr: m[2] } : { zip: "", addr: s || "" };
+}
+function splitPerson(s){
+  const m = (s || "").match(/^(.*?)（(.*?)）\s*$/);
+  return m ? { name: m[1].trim(), kana: m[2].trim() } : { name: (s||"").trim(), kana: "" };
+}
+
+function load(){
+  try {
+    let data = JSON.parse(localStorage.getItem(LS_KEY) || "null");
+    if(!data){
+      // 旧バージョンのデータがあれば引き継ぎ
+      const old = JSON.parse(localStorage.getItem(LS_KEY_OLD) || "null");
+      if(old){
+        data = old;
+        const d = splitZipAddr(old.destAddr); data.destZip = d.zip; data.destAddr = d.addr;
+        const s = splitZipAddr(old.srcAddr);  data.srcZip = s.zip;  data.srcAddr = s.addr;
+        const p = splitPerson(old.destPerson); data.destPersonName = p.name; data.destKana = p.kana;
+        const w = (old.weight || "").match(/[0-9.]+/); if(w) data.weight = w[0];
+      }
+    }
+    if(!data) return;
+    FIELDS.forEach(id => {
+      if(!(id in data)) return;
+      const el = $(id);
+      if(el.type === "checkbox") el.checked = data[id];
+      else el.value = data[id];
+    });
+  } catch(e){}
+}
+
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+async function copyText(text, label){
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(label + "をコピーしました ✅");
+  } catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+    toast(label + "をコピーしました ✅");
+  }
+}
+
+function copyBody(){ copyText(buildBody(), "本文"); }
+function copySubject(){ copyText(buildSubject(), "件名"); }
+
+function openGmail(){
+  const url = "https://mail.google.com/mail/?view=cm&fs=1"
+    + "&su=" + encodeURIComponent(buildSubject())
+    + "&body=" + encodeURIComponent(buildBody());
+  window.open(url, "_blank");
+}
+
+/* ---- 郵便番号→住所 自動入力（zipcloud API） ---- */
+async function zipLookup(zipId, addrId){
+  const z = $(zipId).value.replace(/[^0-9]/g, "");
+  if(z.length !== 7){ toast("郵便番号は7桁で入力してください"); return; }
+  try {
+    const r = await fetch("https://zipcloud.ibsnet.co.jp/api/search?zipcode=" + z);
+    const j = await r.json();
+    if(j.results && j.results[0]){
+      const a = j.results[0];
+      $(addrId).value = a.address1 + a.address2 + a.address3;
+      render();
+      toast("住所を入力しました ✅（番地の続きを追記してください）");
+      $(addrId).focus();
+    } else {
+      toast("この郵便番号の住所が見つかりませんでした");
+    }
+  } catch(e){
+    toast("検索できませんでした（ネット接続を確認してください）");
+  }
+}
+
+/* ---- 受取人ふりがな自動入力 ----
+   漢字に変換する「前」のよみ（ひらがな）を拾ってカタカナにする方式。
+   キーボードで打った場合に自動で入る。貼り付けた場合は手で入力。 */
+let kanaBuf = "", compSnap = "";
+const nameEl = document.getElementById("destPersonName");
+function hira2kata(s){ return s.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60)); }
+
+nameEl.addEventListener("compositionupdate", e => {
+  const d = e.data || "";
+  // まだ「よみ」の状態（ひらがな・カタカナ・長音のみ）のときだけ記録
+  if(d && /^[ぁ-ゖァ-ヶー\s　]*$/.test(d)) compSnap = d;
+});
+nameEl.addEventListener("compositionend", () => {
+  if(compSnap){
+    kanaBuf += compSnap;
+    compSnap = "";
+    $("destKana").value = hira2kata(kanaBuf).replace(/[　]/g, " ");
+    render();
+  }
+});
+nameEl.addEventListener("input", e => {
+  if(nameEl.value === ""){          // 名前を消したらふりがなもリセット
+    kanaBuf = ""; compSnap = "";
+    $("destKana").value = "";
+    render();
+  } else if(!e.isComposing && e.data && /^[\s　]$/.test(e.data)){
+    kanaBuf += " ";                 // 変換外で打ったスペースはふりがなにも反映
+    $("destKana").value = hira2kata(kanaBuf).replace(/[　]/g, " ");
+  }
+});
+
+/* ---- 電卓 ---- */
+function calcOpen(){
+  $("calcDisplay").value = $("insurance").value.replace(/,/g, "");
+  $("calcOverlay").classList.add("show");
+  $("calcDisplay").focus();
+}
+function calcClose(){ $("calcOverlay").classList.remove("show"); }
+
+function calcEval(expr){
+  expr = String(expr).replace(/[×]/g, "*").replace(/[÷]/g, "/")
+    .replace(/[−－ー]/g, "-").replace(/[＋]/g, "+").replace(/,/g, "").trim();
+  if(!expr || !/^[0-9+\-*/. ]+$/.test(expr)) return null;
+  try {
+    const v = Function('"use strict";return(' + expr + ')')();
+    return (typeof v === "number" && isFinite(v)) ? v : null;
+  } catch(e){ return null; }
+}
+
+$("calcGrid").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if(!b) return;
+  const k = b.dataset.k;
+  const d = $("calcDisplay");
+  if(k === "C"){ d.value = ""; }
+  else if(k === "⌫"){ d.value = d.value.slice(0, -1); }
+  else if(k === "="){
+    const v = calcEval(d.value);
+    if(v === null) toast("計算できません");
+    else d.value = String(Math.round(v * 100) / 100);
+  }
+  else { d.value += k; }
+  d.focus();
+});
+
+$("calcDisplay").addEventListener("keydown", e => {
+  if(e.key === "Enter"){ e.preventDefault(); calcConfirm(); }
+  if(e.key === "Escape"){ calcClose(); }
+});
+
+function calcConfirm(){
+  const v = calcEval($("calcDisplay").value);
+  if(v === null){ toast("計算できません（数字と＋−×÷で入力）"); return; }
+  $("insurance").value = Math.round(v).toLocaleString();
+  calcClose();
+  render();
+}
+
+$("insurance").addEventListener("click", calcOpen);
+$("calcOverlay").addEventListener("click", e => {
+  if(e.target === $("calcOverlay")) calcClose();  // 外側クリックで閉じる
+});
+
+/* ---- お届け先プリセット ---- */
+const PRESET_FIELDS = ["destZip","destAddr","destName","destPersonName","destKana","destTel"];
+
+function getPresets(){
+  try {
+    let p = JSON.parse(localStorage.getItem(LS_PRESET) || "null");
+    if(p) return p;
+    // 旧バージョンのプリセットを引き継ぎ
+    const old = JSON.parse(localStorage.getItem(LS_PRESET_OLD) || "null");
+    if(old){
+      p = {};
+      Object.keys(old).forEach(name => {
+        const o = old[name];
+        const d = splitZipAddr(o.destAddr);
+        const per = splitPerson(o.destPerson);
+        p[name] = { destZip: d.zip, destAddr: d.addr, destName: o.destName || "",
+                    destPersonName: per.name, destKana: per.kana, destTel: o.destTel || "" };
+      });
+      localStorage.setItem(LS_PRESET, JSON.stringify(p));
+      return p;
+    }
+    return {};
+  } catch(e){ return {}; }
+}
+
+function refreshPresetList(){
+  const sel = $("presetSelect");
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">📋 保存済みのお届け先から選ぶ…</option>';
+  Object.keys(getPresets()).forEach(name => {
+    const op = document.createElement("option");
+    op.value = name; op.textContent = name;
+    sel.appendChild(op);
+  });
+  sel.value = cur;
+}
+
+function savePreset(){
+  const def = $("destName").value || "お届け先";
+  const name = prompt("この お届け先 の登録名を入力してください", def);
+  if(!name) return;
+  const presets = getPresets();
+  presets[name] = {};
+  PRESET_FIELDS.forEach(id => presets[name][id] = $(id).value);
+  localStorage.setItem(LS_PRESET, JSON.stringify(presets));
+  refreshPresetList();
+  $("presetSelect").value = name;
+  toast("「" + name + "」を保存しました ✅");
+}
+
+function deletePreset(){
+  const name = $("presetSelect").value;
+  if(!name){ toast("削除するプリセットを選んでください"); return; }
+  if(!confirm("「" + name + "」を削除しますか？")) return;
+  const presets = getPresets();
+  delete presets[name];
+  localStorage.setItem(LS_PRESET, JSON.stringify(presets));
+  refreshPresetList();
+  toast("削除しました");
+}
+
+$("presetSelect").addEventListener("change", e => {
+  const name = e.target.value;
+  if(!name) return;
+  const p = getPresets()[name];
+  if(!p) return;
+  PRESET_FIELDS.forEach(id => { if(id in p) $(id).value = p[id]; });
+  kanaBuf = $("destKana").value;   // プリセット読込後もふりがな追記が壊れないように
+  render();
+});
+
+/* ---- 箱に貼るラベル印刷 ---- */
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// 住所から「都道府県＋市区町村」を取り出す（例: 千葉県柏市泉1992-8 → 千葉県柏市）
+function extractRegion(addr){
+  const m = (addr || "").match(/^(.+?[都道府県])(.+?[市区町村])/);
+  return m ? m[1] + m[2] : (addr || "");
+}
+
+function autofillLabels(){
+  $("labelRegion").value = extractRegion($("destAddr").value);
+  $("labelName").value = $("destPersonName").value.trim() || $("destName").value.trim();
+  $("labelItem").value = $("subjectItem").value.trim() || $("itemName").value.trim();
+  render();
+  toast("フォームの内容から入力しました ✅");
+}
+
+function labelAddrPage(){
+  const region = $("labelRegion").value.trim();
+  let name = $("labelName").value.trim();
+  if(!region && !name) return null;
+  if(name){
+    if(!/(様|御中|宛)$/.test(name)) name += "様";
+    if(!/宛$/.test(name)) name += "　宛";
+  }
+  return `<div class="page center">
+    <div class="fit region">${esc(region)}</div>
+    ${name ? `<div class="fit name">${esc(name)}</div>` : ""}
+  </div>`;
+}
+
+function labelItemPage(){
+  const item = $("labelItem").value.trim();
+  const bans = [];
+  if($("banTenchi").checked) bans.push("天地無用");
+  if($("banUwazumi").checked) bans.push("上積み禁止");
+  if($("banYokooki").checked) bans.push("横置き厳禁");
+  if($("banWaremono").checked) bans.push("ワレモノ注意");
+  $("labelExtra").value.split(/[、,]/).map(t => t.trim()).filter(t => t).forEach(t => bans.push(t));
+  if(!item && !bans.length) return null;
+  return `<div class="page left">
+    ${item ? `<div class="fit item">${esc(item)}</div>` : ""}
+    ${bans.map(b => `<div class="fit ban">【${esc(b)}】</div>`).join("")}
+  </div>`;
+}
+
+function buildLabelDoc(pages, autoPrint){
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>ラベル印刷</title>
+<style>
+  @page { size: A4 landscape; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", "Hiragino Sans", "Meiryo", sans-serif; font-weight: bold; }
+  .page {
+    width: 100%; height: 100vh; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center;
+    page-break-after: always; padding: 4mm;
+  }
+  .page.center { align-items: center; text-align: center; }
+  .page.left { align-items: flex-start; text-align: left; }
+  .fit { white-space: nowrap; line-height: 1.15; max-width: 100%; }
+  .region { font-size: 160pt; }
+  .name { font-size: 90pt; margin-top: 30pt; }
+  .item { font-size: 95pt; }
+  .ban { font-size: 85pt; }
+</style></head><body>${pages.join("")}
+<script>
+  // 用紙の幅からはみ出す行は自動で文字を小さくする
+  function fitAll(){
+    document.querySelectorAll(".fit").forEach(el => {
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      while(el.scrollWidth > el.clientWidth && size > 10){
+        size -= 2;
+        el.style.fontSize = size + "px";
+      }
+    });
+  }
+  window.onload = () => { fitAll(); ${autoPrint ? "setTimeout(() => window.print(), 200);" : ""} };
+<\/script></body></html>`;
+}
+
+function printLabels(mode){
+  const pages = [];
+  if(mode === "addr" || mode === "both"){
+    const p = labelAddrPage();
+    if(p) pages.push(p);
+    else if(mode === "addr"){ toast("宛先ラベルの内容を入力してください"); return; }
+  }
+  if(mode === "item" || mode === "both"){
+    const p = labelItemPage();
+    if(p) pages.push(p);
+    else if(mode === "item"){ toast("品名か禁止事項を入力してください"); return; }
+  }
+  if(!pages.length){ toast("ラベルの内容を入力してください"); return; }
+  const w = window.open("", "_blank");
+  if(!w){ toast("ポップアップがブロックされました。許可してください"); return; }
+  w.document.write(buildLabelDoc(pages, true));
+  w.document.close();
+}
+
+/* ---- 営業所検索 ----
+   検索するとページ内にGoogleマップ（埋め込み）で周辺の営業所を表示。
+   そこから「ルートで開く」を押すと入力した住所にもピンが付いた状態で大きな地図が開く */
+function copyDestToBranch(){
+  $("branchAddr").value = $("destAddr").value;
+  toast("お届け先の住所を入れました");
+}
+
+function b64url(s){
+  const bytes = new TextEncoder().encode(s);
+  let bin = "";
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+// Googleマップの埋め込みURL（APIキー不要の形式）を直接組み立てる
+function mapsEmbedUrl(query, zoom){
+  return `https://www.google.com/maps/embed?origin=mfe&pb=!1m3!2m1!1z${b64url(query)}!6i${zoom}`;
+}
+function mapsDirEmbedUrl(from, to){
+  // ルート表示: 出発地・目的地の両方にピンが付く
+  return `https://www.google.com/maps/embed?origin=mfe&pb=!1m5!4m4!4m1!2z${b64url(from)}!4m1!2z${b64url(to)}`;
+}
+
+// 中心座標を指定した検索埋め込み（入力住所を地図の中心にできる）
+function mapsEmbedUrlCentered(query, lat, lng, zoom){
+  return `https://www.google.com/maps/embed?origin=mfe&pb=!1m12!1m8!1m3!1d103727.59245312937!2d${lng}!3d${lat}!3m2!1i1024!2i768!4f13.1!2m1!1z${b64url(query)}!6i${zoom}`;
+}
+
+let branchSearchedAddr = "";
+let branchCenter = null;   // 入力住所の緯度経度（国土地理院APIで取得）
+
+async function searchBranch(){
+  const addr = $("branchAddr").value.trim();
+  if(!addr){ toast("住所を入力してください"); return; }
+  branchSearchedAddr = addr;
+  branchCenter = null;
+  $("branchStatus").textContent = "住所の位置を調べています…";
+  try {
+    const r = await fetch("https://msearch.gsi.go.jp/address-search/AddressSearch?q=" + encodeURIComponent(addr));
+    const j = await r.json();
+    if(j && j.length){
+      branchCenter = { lng: j[0].geometry.coordinates[0], lat: j[0].geometry.coordinates[1] };
+    }
+  } catch(e){}
+  $("branchStatus").textContent = branchCenter
+    ? "⬇ 青いマークが入力した住所です。赤いピンが佐川急便の営業所です。"
+    : "⬇ 住所の正確な位置が取れなかったため目印なしで表示しています。🚗側ならピンが付きます。";
+  $("branchResults").innerHTML = `
+    <div class="chips" style="margin-top:8px">
+      <button class="chip active" id="mapModeList" onclick="branchMapMode('list')">📍 周辺の営業所を全部見る</button>
+      <button class="chip" id="mapModeRoute" onclick="branchMapMode('route')">🚗 一番近い営業所へのルート（両方にピン）</button>
+    </div>
+    <div style="position:relative; margin-top:8px;">
+      <iframe id="branchMap" src="" loading="lazy"
+        style="width:100%; height:420px; border:0; border-radius:8px; display:block;"></iframe>
+      <div id="branchCenterMark">
+        <div class="lbl">入力した住所</div>
+        <div class="pin"></div>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn-copy" onclick="branchRoute()">🚗 ルートを大きな地図で開く</button>
+      <button class="btn-sub" onclick="branchBigMap()">🗾 検索結果を大きな地図で開く</button>
+    </div>
+    <div class="hint">※青いマークは地図の中心に固定されているので、地図をずらすと住所の位置からずれます（戻すには再検索）。地図が表示されない場合は上のボタンから開いてください。</div>`;
+  branchMapMode("list");
+}
+
+function branchMapMode(mode){
+  const map = $("branchMap");
+  const mark = $("branchCenterMark");
+  if(!map || !branchSearchedAddr) return;
+  if(mode === "route"){
+    map.src = mapsDirEmbedUrl(branchSearchedAddr, "佐川急便 営業所");
+    mark.style.display = "none";  // ルート表示はGoogle側でピンが付く
+  } else if(branchCenter){
+    map.src = mapsEmbedUrlCentered("佐川急便 営業所", branchCenter.lat, branchCenter.lng, 12);
+    mark.style.display = "block";
+  } else {
+    map.src = mapsEmbedUrl("佐川急便 営業所 " + branchSearchedAddr + " 周辺", 12);
+    mark.style.display = "none";
+  }
+  $("mapModeList").classList.toggle("active", mode === "list");
+  $("mapModeRoute").classList.toggle("active", mode === "route");
+}
+
+function branchRoute(){
+  const addr = $("branchAddr").value.trim();
+  if(!addr){ toast("住所を入力してください"); return; }
+  // 出発地=入力住所、目的地=佐川急便営業所（住所に一番近い所が選ばれる）
+  const url = "https://www.google.com/maps/dir/?api=1"
+    + "&origin=" + encodeURIComponent(addr)
+    + "&destination=" + encodeURIComponent("佐川急便 営業所");
+  window.open(url, "_blank");
+}
+
+function branchBigMap(){
+  const addr = $("branchAddr").value.trim();
+  if(!addr){ toast("住所を入力してください"); return; }
+  window.open("https://www.google.com/maps/search/" + encodeURIComponent("佐川急便 営業所 " + addr + " 周辺"), "_blank");
+}
+
+$("branchAddr").addEventListener("keydown", e => {
+  if(e.key === "Enter"){ e.preventDefault(); searchBranch(); }
+});
+
+/* ---- 初期値に戻す ---- */
+const DEFAULTS = {
+  sender:"菊地", subjectItem:"", itemName:"", sizeL:"", sizeW:"", sizeH:"",
+  weight:"", method:"小口チャーター", useInsurance:false, insurance:"",
+  arriveDate:"", pickupDate:"", pickupTime:"午前中", notifyOnArrive:true,
+  srcZip:"277-0912", srcAddr:"千葉県柏市泉1992-8", srcTel:"04-7197-1226",
+  srcDay:"本日", srcTime:"13:00〜15:00"
+};
+
+function resetDefaults(){
+  if(!confirm("品物・日付などを空欄に戻します（お届け先はそのまま）。よろしいですか？")) return;
+  Object.keys(DEFAULTS).forEach(id => {
+    const el = $(id);
+    if(el.type === "checkbox") el.checked = DEFAULTS[id];
+    else el.value = DEFAULTS[id];
+  });
+  render();
+}
+
+/* ---- 初期化 ---- */
+load();
+kanaBuf = $("destKana").value;   // 復元したふりがなに続けて追記できるように
+refreshPresetList();
+FIELDS.forEach(id => $(id).addEventListener("input", render));
+render();
+</script>
+</body>
+</html>
